@@ -3,6 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <title>WebRTC 1:1 Call</title>
+  <style>
+    #videos {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    video {
+      width: 45%;
+      height: auto;
+      background: black;
+    }
+  </style>
 </head>
 <body>
   <h2>WebRTC Call Room</h2>
@@ -10,8 +22,8 @@
   <button onclick="joinRoom()">Join</button>
 
   <div id="videos">
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
+    <video id="localVideo" autoplay muted playsinline></video>
+    <video id="remoteVideo" autoplay playsinline></video>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
