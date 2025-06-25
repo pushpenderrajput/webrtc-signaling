@@ -2,30 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>WebRTC 1:1 Call</title>
+  <title>1:1 Video Call</title>
   <style>
-    #videos {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-    }
-    video {
-      width: 45%;
-      height: auto;
-      background: black;
-    }
+    body { font-family: sans-serif; text-align: center; }
+    video { width: 45%; border: 1px solid #333; margin: 10px; background: black; }
+    #videos { display: flex; justify-content: center; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <h2>WebRTC Call</h2>
-  <input id="roomInput" placeholder="Enter room ID" />
+  <h2>1:1 Audio/Video Call</h2>
+  <input id="roomInput" placeholder="Room ID" />
   <button onclick="joinRoom()">Join</button>
-
   <div id="videos">
     <video id="localVideo" autoplay muted playsinline></video>
     <video id="remoteVideo" autoplay playsinline></video>
   </div>
-
   <script src="/socket.io/socket.io.js"></script>
   <script src="client.js"></script>
 </body>

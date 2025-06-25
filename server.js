@@ -1,29 +1,21 @@
-// server.js
 const express = require("express");
 const http = require("http");
-const socketIO = require("socket.io");
+const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIO(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
+const io = new Server(server);
 
-// Serve static files from 'public'
-app.use(express.static("public"));
+app.use(express.static("public")); // serve HTML/JS
 
 io.on("connection", (socket) => {
-  console.log(`New client connected: ${socket.id}`);
+  console.log("User connected:", socket.id);
 
-  socket.on("join", (roomId) => {
-    socket.join(roomId);
-    console.log(`Socket ${socket.id} joined room ${roomId}`);
-    const clients = io.sockets.adapter.rooms.get(roomId) || [];
-    if (clients.size > 1) {
-      io.to(roomId).emit("ready");
+  socket.on("join", (room) => {
+    socket.join(room);
+    const count = io.sockets.adapter.rooms.get(room)?.size || 0;
+    if (count === 2) {
+      io.to(room).emit("ready"); // Both joined
     }
   });
 
@@ -40,11 +32,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log(`Client disconnected: ${socket.id}`);
+    console.log("User disconnected:", socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Signaling server running on port ${PORT}`);
+  console.log("Server running on port", PORT);
 });
