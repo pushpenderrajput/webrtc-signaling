@@ -1,4 +1,5 @@
-const socket = io();
+const socket = io("https://webrtcsignaling.duckdns.org"); // ✅ Replace with your domain
+
 let localStream;
 let remoteStream = new MediaStream();
 let peerConnection;
@@ -12,28 +13,27 @@ const config = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     {
-      urls: "turn:<YOUR_EC2_IP>:3478",
+      urls: "turn:<your-turn-ip-or-domain>:3478",
       username: "webrtcuser",
       credential: "strongpassword"
     }
   ]
 };
 
-function log(msg) {
-  console.log("[client]", msg);
-}
-
 async function joinRoom() {
   room = roomInput.value.trim();
   if (!room) return;
 
-  log(`Joining room: ${room}`);
+  console.log("Joining room", room);
   socket.emit("join", room);
 
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  localVideo.srcObject = localStream;
-  
-  remoteVideo.srcObject = remoteStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
+  } catch (err) {
+    console.error("Media access error:", err);
+    return;
+  }
 
   createPeerConnection();
 
@@ -52,25 +52,24 @@ function createPeerConnection() {
   };
 
   peerConnection.ontrack = event => {
-    log("Remote track received");
-    event.streams[0].getTracks().forEach(track => {
-      remoteStream.addTrack(track);
-    });
+    console.log("Received track", event.streams);
+    remoteVideo.srcObject = event.streams[0];
   };
 
   peerConnection.oniceconnectionstatechange = () => {
-    log("ICE State: " + peerConnection.iceConnectionState);
+    console.log("ICE connection state:", peerConnection.iceConnectionState);
   };
 }
 
 socket.on("ready", async () => {
-  log("Creating and sending offer...");
+  console.log("Both joined. Creating offer...");
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
   socket.emit("offer", { room, sdp: offer });
 });
 
 socket.on("offer", async (offer) => {
+  console.log("Received offer");
   if (!peerConnection) {
     createPeerConnection();
     localStream.getTracks().forEach(track => {
@@ -78,7 +77,6 @@ socket.on("offer", async (offer) => {
     });
   }
 
-  log("Received offer, sending answer...");
   await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
@@ -86,11 +84,11 @@ socket.on("offer", async (offer) => {
 });
 
 socket.on("answer", async (answer) => {
-  log("Received answer");
+  console.log("Received answer");
   await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
 });
 
 socket.on("ice-candidate", (candidate) => {
-  log("Adding received ICE candidate");
+  console.log("Adding ICE candidate", candidate);
   peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
 });
