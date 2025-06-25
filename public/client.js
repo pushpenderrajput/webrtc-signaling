@@ -1,77 +1,90 @@
-const socket = io("https://webrtcsignaling.duckdns.org"); // Replace with your domain
+const socket = io("https://webrtcsignaling.duckdns.org");
 
-let localStream;
-let remoteStream = new MediaStream();
-let peerConnection;
-let room;
-
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
+let localStream, remoteStream, pc;
+let myUsername, targetUsername;
 
 const config = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    // Optional: Add TURN here
-  ]
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
 };
 
-async function joinRoom() {
-  room = document.getElementById("roomInput").value.trim();
-  if (!room) return alert("Enter room ID");
+function register() {
+  myUsername = document.getElementById("username").value.trim();
+  socket.emit("register", myUsername);
+}
 
-  socket.emit("join", room);
+async function startCall() {
+  targetUsername = document.getElementById("target").value.trim();
+  socket.emit("call-user", { to: targetUsername });
+}
 
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  localVideo.srcObject = localStream;
-  remoteVideo.srcObject = remoteStream;
+socket.on("incoming-call", ({ from }) => {
+  document.getElementById("incoming").innerHTML = `
+    Incoming call from ${from}
+    <button onclick="acceptCall('${from}')">Accept</button>
+  `;
+});
 
+async function acceptCall(from) {
+  targetUsername = from;
+  document.getElementById("incoming").innerHTML = "";
+  socket.emit("accept-call", { from });
+
+  await setupMedia();
   createPeerConnection();
 
   localStream.getTracks().forEach(track => {
-    peerConnection.addTrack(track, localStream);
+    pc.addTrack(track, localStream);
   });
 }
 
-function createPeerConnection() {
-  peerConnection = new RTCPeerConnection(config);
+socket.on("call-accepted", async ({ by }) => {
+  await setupMedia();
+  createPeerConnection();
 
-  peerConnection.onicecandidate = event => {
+  localStream.getTracks().forEach(track => {
+    pc.addTrack(track, localStream);
+  });
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  socket.emit("offer", { to: by, sdp: offer });
+});
+
+socket.on("offer", async ({ from, sdp }) => {
+  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  socket.emit("answer", { to: from, sdp: answer });
+});
+
+socket.on("answer", async ({ sdp }) => {
+  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+});
+
+socket.on("ice-candidate", async ({ candidate }) => {
+  if (candidate) {
+    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  }
+});
+
+function createPeerConnection() {
+  remoteStream = new MediaStream();
+  pc = new RTCPeerConnection(config);
+
+  pc.onicecandidate = (event) => {
     if (event.candidate) {
-      socket.emit("ice-candidate", { room, candidate: event.candidate });
+      socket.emit("ice-candidate", { to: targetUsername, candidate: event.candidate });
     }
   };
 
-  peerConnection.ontrack = event => {
-    event.streams[0].getTracks().forEach(track => {
-      remoteStream.addTrack(track);
-    });
+  pc.ontrack = (event) => {
+    remoteStream.addTrack(event.track);
+    document.getElementById("remoteVideo").srcObject = remoteStream;
   };
 }
 
-socket.on("ready", async () => {
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
-  socket.emit("offer", { room, sdp: offer });
-});
-
-socket.on("offer", async (offer) => {
-  if (!peerConnection) createPeerConnection();
-
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-
-  localStream.getTracks().forEach(track => {
-    peerConnection.addTrack(track, localStream);
-  });
-
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
-  socket.emit("answer", { room, sdp: answer });
-});
-
-socket.on("answer", async (answer) => {
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-});
-
-socket.on("ice-candidate", async (candidate) => {
-  await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-});
+async function setupMedia() {
+  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  document.getElementById("localVideo").srcObject = localStream;
+}
