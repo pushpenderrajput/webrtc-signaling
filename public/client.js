@@ -1,16 +1,23 @@
 const socket = io();
-let localStream, remoteStream;
+let localStream;
+let remoteStream;
 let peerConnection;
 const roomInput = document.getElementById("roomInput");
-
-const servers = {
+const config = {
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" }, // Add your TURN here if needed
-  ],
+    {
+      urls: "stun:stun.l.google.com:19302"
+    }
+    // You can add TURN here if needed
+  ]
 };
-
+function log(msg) {
+  console.log("[client]", msg);
+}
 function joinRoom() {
-  const room = roomInput.value;
+  const room = roomInput.value.trim();
+  if (!room) return;
+  log(`Joining room: ${room}`);
   socket.emit("join", room);
 
   navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
